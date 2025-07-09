@@ -1,6 +1,6 @@
 # WebGPU Kaleidoscope Demo
 
-This project is a simple WebGPU-based digital kaleidoscope built with Vite. It captures video from your webcam and displays it using a kaleidoscope effect. The display page and a separate settings page are built with TypeScript.
+This project is a simple WebGPU-based digital kaleidoscope built with Vite. It captures video from your webcam and displays it using a kaleidoscope effect. The display page and a separate settings page are built with TypeScript.  You can switch between a circular or triangular mask and change the number of segments in the settings page.
 
 ## Development
 

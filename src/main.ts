@@ -8,7 +8,7 @@ interface Uniforms {
   time: number;
   segments: number;
   shape: number;
-  resolution: [number, number];
+  width: number;
 }
 
 async function start() {
@@ -28,7 +28,7 @@ async function start() {
     time: 0,
     segments: Number(localStorage.getItem('segments') || 6),
     shape: localStorage.getItem('shape') === 'triangle' ? 1 : 0,
-    resolution: [canvas.width, canvas.height]
+    width: canvas.width
   };
 
   const uniformBuffer = device.createBuffer({
@@ -39,26 +39,54 @@ async function start() {
   const sampler = device.createSampler({ magFilter: 'linear', minFilter: 'linear' });
 
   const shader = device.createShaderModule({
-    code: `struct Uniforms { time: f32, segments: f32, shape: f32, width: f32 };@group(0) @binding(0) var<uniform> uni: Uniforms;@group(0) @binding(1) var img: texture_external;@group(0) @binding(2) var samp: sampler;
+    code: `struct Uniforms { time: f32, segments: f32, shape: f32, width: f32 };
+      @group(0) @binding(0) var<uniform> uni: Uniforms;
+      @group(0) @binding(1) var img: texture_external;
+      @group(0) @binding(2) var samp: sampler;
+
       @vertex fn vs(@builtin(vertex_index) i: u32) -> @builtin(position) vec4f {
         var pos = array<vec2f,6>(
-          vec2f(-1,-1), vec2f(1,-1), vec2f(-1,1),
-          vec2f(-1,1), vec2f(1,-1), vec2f(1,1)
+          vec2f(-1.0,-1.0), vec2f(1.0,-1.0), vec2f(-1.0,1.0),
+          vec2f(-1.0,1.0), vec2f(1.0,-1.0), vec2f(1.0,1.0)
         );
-        return vec4f(pos[i],0,1);
+        return vec4f(pos[i], 0.0, 1.0);
       }
+
       fn kaleido(uv: vec2f) -> vec2f {
         let r = length(uv);
         var a = atan2(uv.y, uv.x) + uni.time;
         let k = uni.segments / 2.0;
-        a = abs(mod(a, 2.0*3.14159265/k) - 3.14159265/k);
+        a = abs(mod(a, 2.0 * 3.14159265 / k) - 3.14159265 / k);
         return vec2f(cos(a), sin(a)) * r;
       }
+
+      fn inside_triangle(p: vec2f) -> bool {
+        let a = vec2f(0.0, 1.0);
+        let b = vec2f(-0.8660254, -0.5);
+        let c = vec2f(0.8660254, -0.5);
+        let ab = b - a;
+        let bc = c - b;
+        let ca = a - c;
+        let ap = p - a;
+        let bp = p - b;
+        let cp = p - c;
+        let cross1 = ab.x * ap.y - ab.y * ap.x;
+        let cross2 = bc.x * bp.y - bc.y * bp.x;
+        let cross3 = ca.x * cp.y - ca.y * cp.x;
+        return (cross1 >= 0.0 && cross2 >= 0.0 && cross3 >= 0.0);
+      }
+
       @fragment fn fs(@builtin(position) pos: vec4f) -> @location(0) vec4f {
-        var uv = (pos.xy/uni.width)*2.0 - 1.0;
+        var uv = (pos.xy / uni.width) * 2.0 - 1.0;
         var coord = kaleido(uv);
-        var color = textureSampleLevel(img, samp, coord*0.5+0.5, 0.0);
-        if (uni.shape < 0.5 && length(uv) > 1.0) { discard; }
+        var color = textureSampleLevel(img, samp, coord * 0.5 + 0.5, 0.0);
+        var inside = true;
+        if (uni.shape < 0.5) {
+          inside = length(uv) <= 1.0;
+        } else {
+          inside = inside_triangle(uv);
+        }
+        if (!inside) { discard; }
         return color;
       }`
   });
@@ -85,7 +113,7 @@ async function start() {
       uniforms.time,
       uniforms.segments,
       uniforms.shape,
-      canvas.width
+      uniforms.width
     ]));
 
     const encoder = device.createCommandEncoder();
